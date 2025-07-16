@@ -1,0 +1,193 @@
+[ 요약 ] 
+
+# 목표 : 틱톡 영상을 텍스트로 자동 변환하는 Python 도구 개발
+# 목표 : Whisper AI를 활용한 음성 인식 시스템 구축
+# 고민 점 : 주로 막히는게 1. 내부 디렉토리 오류 ( 파일 찾을 수 없음 ) / 2.api 연동에서 항상 막힙니다 
+
+[ 사용 도구 ]
+
+IDE: Cursor AI
+언어: Python 3.13
+자동화: n8n (향후 계획)
+라이브러리: OpenAI Whisper
+
+
+#1. 내부 디렉토리 
+
+# [ 현재 코드 ] 
+import whisper
+import os
+import time
+from datetime import datetime
+
+def transcribe_video_to_text(video_path, output_text_path=None, model_size="base"):
+    """
+    틱톡 영상을 텍스트로 변환하는 함수
+    
+    Args:
+        video_path (str): 영상 파일 경로
+        output_text_path (str): 출력 텍스트 파일 경로 (선택사항)
+        model_size (str): Whisper 모델 크기 (tiny, base, small, medium, large)
+    
+    Returns:
+        str: 변환된 텍스트
+    """
+    try:
+        # 시작 시간 기록
+        start_time = time.time()
+        
+        # 출력 파일 경로 자동 생성
+        if output_text_path is None:
+            base_name = os.path.splitext(os.path.basename(video_path))[0]
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_text_path = f"{base_name}_{timestamp}_transcript.txt"
+        
+        print(f"🎬 영상 파일: {os.path.basename(video_path)}")
+        print(f"📝 출력 파일: {output_text_path}")
+        print(f"🤖 모델 크기: {model_size}")
+        print("-" * 50)
+        
+        # Whisper 모델 로드
+        print("⏳ Whisper 모델을 로드 중입니다...")
+        model = whisper.load_model(model_size)
+        
+        # 진행 상황 표시
+        print("🔄 영상 파일을 처리 중입니다...")
+        
+        # 음성 추출 및 텍스트 변환 (타임스탬프 포함)
+        result = model.transcribe(
+            video_path, 
+            language='ko',
+            word_timestamps=True,
+            initial_prompt="틱톡 숏폼 영상의 한국어 음성을 정확히 변환해주세요."
+        )
+        
+        # 결과 텍스트 추출
+        full_text = result['text']
+        
+        # 결과를 텍스트 파일로 저장
+        with open(output_text_path, 'w', encoding='utf-8') as f:
+            f.write("=" * 60 + "\n")
+            f.write("🎬 틱톡 영상 텍스트 변환 결과\n")
+            f.write("=" * 60 + "\n")
+            f.write(f"📅 변환 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"📁 원본 파일: {os.path.basename(video_path)}\n")
+            f.write(f"🤖 모델 크기: {model_size}\n")
+            f.write("-" * 60 + "\n\n")
+            
+            # 전체 텍스트
+            f.write("📝 전체 텍스트:\n")
+            f.write(full_text + "\n\n")
+            
+            # 타임스탬프별 텍스트
+            f.write("⏰ 타임스탬프별 텍스트:\n")
+            f.write("-" * 40 + "\n")
+            for segment in result['segments']:
+                start_time_str = format_time(segment['start'])
+                end_time_str = format_time(segment['end'])
+                f.write(f"[{start_time_str} - {end_time_str}] {segment['text']}\n")
+        
+        # 처리 완료 메시지
+        end_time = time.time()
+        processing_time = end_time - start_time
+        
+        print("✅ 텍스트 변환이 완료되었습니다!")
+        print(f"📊 처리 시간: {processing_time:.2f}초")
+        print(f"📄 결과 파일: {output_text_path}")
+        print(f"📝 변환된 텍스트: {full_text[:100]}...")
+        
+        return full_text
+        
+    except FileNotFoundError:
+        error_msg = f"❌ 파일을 찾을 수 없습니다: {video_path}"
+        print(error_msg)
+        return None
+        
+    except Exception as e:
+        error_msg = f"❌ 오류가 발생했습니다: {e}"
+        print(error_msg)
+        return None
+
+def format_time(seconds):
+    """초를 MM:SS 형식으로 변환"""
+    minutes = int(seconds // 60)
+    seconds = int(seconds % 60)
+    return f"{minutes:02d}:{seconds:02d}"
+
+def batch_process_videos(video_folder, model_size="base"):
+    """
+    폴더 내 모든 영상을 일괄 처리
+    
+    Args:
+        video_folder (str): 영상 파일들이 있는 폴더 경로
+        model_size (str): Whisper 모델 크기
+    """
+    video_extensions = ['.mp4', '.mov', '.avi', '.mkv', '.mp3', '.wav']
+    
+    if not os.path.exists(video_folder):
+        print(f"❌ 폴더를 찾을 수 없습니다: {video_folder}")
+        return
+    
+    video_files = []
+    for file in os.listdir(video_folder):
+        if any(file.lower().endswith(ext) for ext in video_extensions):
+            video_files.append(os.path.join(video_folder, file))
+    
+    if not video_files:
+        print("❌ 처리할 영상 파일이 없습니다.")
+        return
+    
+    print(f"📁 {len(video_files)}개의 영상 파일을 발견했습니다.")
+    print("🚀 일괄 처리를 시작합니다...\n")
+    
+    for i, video_path in enumerate(video_files, 1):
+        print(f"📹 [{i}/{len(video_files)}] 처리 중: {os.path.basename(video_path)}")
+        transcribe_video_to_text(video_path, model_size=model_size)
+        print()
+
+if __name__ == "__main__":
+    # 설정
+    VIDEO_PATH = "C:\\Users\\tatw1\\cursor\\snaptik_7499428541549923592.mp4"
+    OUTPUT_PATH = "transcription_result.txt"
+    MODEL_SIZE = "base"  # tiny, base, small, medium, large
+    
+    # 파일 존재 여부 확인
+    if not os.path.isfile(VIDEO_PATH):
+        print("❌ 영상 파일을 찾을 수 없습니다.")
+        print("📁 현재 폴더의 파일 목록:")
+        current_files = [f for f in os.listdir('.') if f.lower().endswith(('.mp4', '.mov', '.avi'))]
+        if current_files:
+            for file in current_files:
+                print(f"  - {file}")
+            print("\n위 파일 중 하나를 선택하여 VIDEO_PATH를 수정하세요.")
+        else:
+            print("  영상 파일이 없습니다.")
+    else:
+        # 단일 파일 처리
+        result = transcribe_video_to_text(VIDEO_PATH, OUTPUT_PATH, MODEL_SIZE)
+        
+        if result:
+            print("\n" + "="*60)
+            print("🎉 변환 완료! 다음 단계로 진행할 수 있습니다:")
+            print("1. 키워드 빈도 분석")
+            print("2. 구간별 스크립트 분할")
+            print("3. 후킹 멘트 분석")
+            print("="*60)
+    
+    # 일괄 처리 예시 (주석 해제하여 사용)
+    # batch_process_videos("C:\\Users\\tatw1\\cursor", MODEL_SIZE)
+
+# [ 터미널 출력 되는 내용 ] 
+
+Traceback (most recent call last):
+  File "c:\Users\tatw1\cursor\틱톡.py", line 1, in <module>
+    import whisper
+  File "C:\Users\tatw1\AppData\Local\Programs\Python\Python313\Lib\site-packages\whisper\__init__.py", line 13, in <module>
+    from .model import ModelDimensions, Whisper
+  File "C:\Users\tatw1\AppData\Local\Programs\Python\Python313\Lib\site-packages\whisper\model.py", line 14, in <module>   
+    from .transcribe import transcribe as transcribe_function
+ImportError: cannot import name 'transcribe' from 'whisper.transcribe' (C:\Users\tatw1\AppData\Local\Programs\Python\Python313\Lib\site-packages\whisper\transcribe.py)
+PS C:\Users\tatw1\cursor> 
+
+
+# 문제2. 강제 디렉토리로 연결했을때는 api 연동이 안되었습니다
