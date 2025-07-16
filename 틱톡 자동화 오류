@@ -1,0 +1,173 @@
+#problem": "틱톡 분석 도구 개발 중 막힌 부분",
+#"tool": "n8n",
+#"description": "현재 Apify Scraper 설정에서 구체적인 파라미터 설정 및 데이터 추출 로직에 어려움을 겪고 있습니다.",
+
+{
+  "name": "0715 - 틱톡 모니터링 자동화",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tiktok-scrape",
+        "options": {}
+      },
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        -460
+      ],
+      "id": "53a50e65-3c16-43fd-a930-0ef2aa749a9e",
+      "webhookId": "6c39ccf2-4ce3-452f-b172-8ff5ec7f2b74"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Webhook으로 받은 데이터(items)에서 URL을 가져옵니다.\nconst url = items[0].json.body.url;\n\n// URL에서 '@' 기호를 기준으로 뒷부분(사용자 이름)을 잘라냅니다.\nconst username = url.split('@').pop().replace('/', '');\n\n// 다음 노드에서 쓸 수 있도록 { \"username\": \"someuser\" } 형태로 만들어 돌려줍니다.\nreturn [{\n  json: {\n    username: username\n  }\n}];"
+      },
+      "name": "Extract Username",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1180,
+        -460
+      ],
+      "id": "ea443ee4-4a16-4d13-8383-211f29ae97b0"
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "https://api.apify.com/v2/acts/clockworks~tiktok-scraper/runs",
+        "options": {},
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "startUrls",
+              "value": "=[{\"url\": \"https://www.tiktok.com/@{{$json.username}}\"}]"
+            },
+            {
+              "name": "maxPosts",
+              "value": "100"
+            }
+          ]
+        },
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "token",
+              "value": "apify_api_oLEUHMM6MHm1k9wuCsgipqF20rMKeb4Cq8Ko"
+            }
+          ]
+        }
+      },
+      "name": "Call Apify Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        -440
+      ],
+      "id": "4d9af9ae-8f79-474b-a2d8-fddc0d03335f"
+    },
+    {
+      "parameters": {
+        "functionCode": "\nconst videos = $json[\"defaultDatasetItems\"];\nvideos.sort((a, b) => (b.diggCount || 0) - (a.diggCount || 0));\nreturn videos.slice(0, 10).map(video => ({\n  video_url: video.webVideoUrl,\n  views: video.playCount,\n  likes: video.diggCount,\n  comments: video.commentCount,\n  description: video.desc\n}));\n"
+      },
+      "name": "Select Top 10",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        1700,
+        -460
+      ],
+      "id": "81b94b63-17fc-49d5-b667-a259ab459f6a"
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "sheetId": "YOUR_GOOGLE_SHEET_ID",
+        "range": "Sheet1!A1",
+        "options": {}
+      },
+      "name": "Save to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        1960,
+        -460
+      ],
+      "id": "43e42724-66f2-4ccc-bdb9-3e5bf4e82623"
+    }
+  ],
+  "pinData": {
+    "Webhook": [
+      {
+        "json": {
+          "headers": {
+            "host": "ceoharvey.app.n8n.cloud",
+            "user-agent": "curl/8.13.0",
+            "content-length": "48",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "218.145.162.2",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "KR",
+            "cf-ray": "95f7431f82ef29e3-FUK",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "content-type": "application/json",
+            "x-forwarded-for": "218.145.162.2, 172.70.199.179",
+            "x-forwarded-host": "ceoharvey.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-85-bb845fb9-2wjl2",
+            "x-is-trusted": "yes",
+            "x-real-ip": "218.145.162.2"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "url": "https://www.tiktok.com/@charlidamelio"
+          },
+          "webhookUrl": "https://ceoharvey.app.n8n.cloud/webhook-test/tiktok-scrape",
+          "executionMode": "test"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract Username",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Username": {
+      "main": [
+        [
+          {
+            "node": "Call Apify Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1507bd8d-b043-4a49-a635-2463b74c4a1c",
+  "meta": {
+    "instanceId": "ac2ced84fa78d457bc0a1c03c6df2819fbca9b501a9a0e524903a2a88c6b6e91"
+  },
+  "id": "2i4jmdDewU7hSR2Y",
+  "tags": []
+}
